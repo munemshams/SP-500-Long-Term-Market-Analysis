@@ -1,0 +1,234 @@
+---
+title: "Analysis of stock market trends from a dataset containing S&P 500 index values"
+author: "Munem Shariar Shams"
+date: "2025-04-15"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r loading in the libraries}
+library(tidyverse)
+library(readr)
+library(infer)
+library(broom)
+
+```
+
+```{r seeing first few rows of the data using head}
+stock_market_df <- read.csv("SPX.csv")
+head(stock_market_df)
+```
+
+```{r structure of the data}
+str(stock_market_df)
+```
+
+```{r summary of the data}
+summary(stock_market_df)
+```
+
+**The dataset includes daily S&P 500 index values from 1927 to 2020, covering prices (open, high, low, close, adjusted close) and trading volume across 23323 records. I chose this dataset as I wanted to analyze the stock market in the context of extremely long-term trends, and the S&P 500 is a key indicator for the same.**
+
+**The index went from \$4.40 to \$3,580.84 (min to max), which is nearly a century of economic growth. The mean price (\$486.92) is much higher than the median (\$99.50) of the closing price, which suggests a right-skewed distribution due to recent surges.**
+
+**Volume ranges from 0 to 11 billion shares, with random spikes most likely due to important events. Converting the Date column to a regular date format enables analysis by time.**
+
+**In general, the data set is perfect for investigating returns, volatility, and trends with confidence intervals, plots, and hypothesis tests.**
+
+
+```{r changing date from character to date}
+stock_market_df$Date <- as.Date(stock_market_df$Date)
+```
+
+**Daily Returns**
+
+```{r finding out the daily change}
+stock_market_df <- stock_market_df%>%
+  arrange(Date) %>%
+  mutate(Return = (Close - lag(Close)) / lag(Close))
+
+head(stock_market_df)
+```
+
+```{r plotting the daily change}
+ggplot(stock_market_df, aes(x = Date, y = Return)) +
+  geom_line(color='steelblue') +
+  labs(title = "Daily Returns of S&P 500 (1927–2020)", x = "Date",  y = "Return") +
+  theme_minimal()
+
+```
+
+```{r summary and standard deviation of the daily returns}
+summary(stock_market_df$Return)
+sd(stock_market_df$Return, na.rm = TRUE) 
+```
+
+**The summary statistics and standard deviation of the daily returns provide a good picture of the long-term dynamics of the S&P 500. The mean daily return is approximately 0.03%, with a slight positive drift on average. But the range of returns is extremely narrow, with the middle 50% (between the 1st and the 3rd quartile) between approximately -0.45% and +0.54%. The lowest return was approximately -20.5%, and the highest return was about 16.6%, indicating that extreme movements-though not common-can take place. The daily return standard deviation is 1.2%, indicating typical day-to-day market volatility. Generally, the data indicates that although the S&P 500 increases slowly in the long term, it does experience sharp, occasional movements.**
+
+```{r finding out which days had the worst and best days}
+stock_market_clean <- stock_market_df %>%
+  filter(!is.na(Return))
+
+stock_market_clean %>%
+  filter(Return == min(Return, na.rm = TRUE) | 
+         Return == max(Return, na.rm = TRUE))
+
+```
+
+```{r getting the 95% CI for mean returns}
+stock_market_clean <- stock_market_df %>%
+  filter(!is.na(Return))
+
+bootstrap_dist <- stock_market_clean %>%
+  specify(response = Return) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "mean")
+
+ci_bounds <- quantile(bootstrap_dist$stat, probs = c(0.025, 0.975))
+
+ci_bounds
+```
+
+**The 95% confidence interval for the mean S&P 500 daily return is approximately 0.015% to 0.045%. This means that the mean daily return is really small but positive, signifying consistent long-term growth. Although the returns are small for any given day, they possess huge compounding power over time frames. The fact that the whole interval is positive makes the case for the market moving upwards in the long run more persuasive.**
+
+```{r usual returns daily and its density}
+ggplot(stock_market_clean, aes(x = Return)) +
+  geom_density(fill = "lightblue", alpha = 0.6) +
+  labs(title = "Distribution of Daily S&P 500 Returns", x = "Daily Return", y = "Density") +
+  theme_minimal()
+
+```
+
+**The daily S&P 500 returns density plot provides an overall intuition as to the way returns are dispersed, as nearly all changes tend to be tiny and lie grouped around zero. This is only a statistical perception, though, and does not express when specific significant events occurred. Large market shock events like the Great Depression, the financial crash of 2008, or the COVID-19 drop are smoothed over in the edges of the distribution and lose the timeline. This is a revealing difference with the earlier time series plot, displaying returns against time on a day-to-day basis. The time series allows us to notice exactly when extreme volatility happened and how the market responded to major historical events. The density plot, on the other hand, is useful for observing the general shape and risk picture of returns but loses the story of when and why those periodic shocks did occur. Hence, both the plots are utilized for distinct purposes and utilized better together for a more thorough analysis.**
+
+```{r comparing mean return by decades}
+stock_market_df <- stock_market_df %>%
+  mutate(Decade = floor(year(Date) / 10) * 10)
+
+summary_stats <- stock_market_df %>%
+  filter(!is.na(Return)) %>%
+  group_by(Decade) %>%
+  summarise(meanreturn = mean(Return), volatility = sd(Return))
+
+ggplot(summary_stats, aes(x = factor(Decade))) +
+  geom_col(aes(y = meanreturn), fill = "steelblue") +
+  geom_point(aes(y = volatility), color = "red", size = 3) +
+  labs(title = "Mean Return and Volatility by Decade", x = "Decade", y = "Value") +
+  theme_minimal()
+```
+
+```{r calculating average return by days of the week}
+stock_market_clean <- stock_market_clean %>%
+  mutate(weekday = factor(weekdays(Date), levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")),month = factor(months(Date),levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")))
+
+weekday_summary <- stock_market_clean %>%
+  group_by(weekday) %>%
+  summarise(meanreturn = mean(Return),sdreturn = sd(Return))
+
+ggplot(weekday_summary, aes(x = weekday, y = meanreturn)) +
+  geom_col(fill = "orange") +
+  labs(title = "Average Return by Day of the Week", x = "Day",  y = "Mean Return") +
+  theme_minimal()
+```
+
+**The bar graph shows the average weekday return of the S&P 500. Wednesday has the largest average return, followed by Friday and Tuesday. Monday has a slightly negative average return, which could be an indication of a potential "Monday effect" that returns are generally lower at the start of the week. This could be a sign of investor sentiment or weekend news reaction. Overall, however, differences are small, but they do show mild weekday patterns in market activity.**
+
+```{r calculating average return monthly}
+monthly_summary <- stock_market_clean %>%
+  group_by(month) %>%
+  summarise(meanreturn = mean(Return),sdreturn = sd(Return))
+
+ggplot(monthly_summary, aes(x = month, y = meanreturn)) +
+  geom_col(fill = "black") +
+  labs(title = "Average Return by Month", y = "Mean Return", x = "Month") +
+  theme_minimal()
+```
+
+**The bar graph shows the average S&P 500 return by month. The highest average returns come in the months of April, July, and December, suggesting seasonal strength during these months. There is a definite negative return in September, supporting the well-publicized "September effect" in markets. While most months have low returns, the graph does show some typical seasonal effects in market performance.**
+
+```{r finding how major events impact price movements}
+stock_market_clean <- stock_market_clean %>%
+  mutate(marketcrash2008 = ifelse(Date < as.Date("2008-09-15"), "Before 2008", "After 2008"))
+
+ggplot(stock_market_clean, aes(x = Date, y = Return)) +
+  geom_line(color = "darkgray") +
+  geom_vline(xintercept = as.Date("2008-09-15"), color = "red") +
+  geom_vline(xintercept = as.Date("1987-10-19"), color = "blue") +
+  labs(title = "S&P 500 Daily Returns with 1987 and 2008 Crash Markers", x = "Date", y = "Daily Return") +
+  theme_minimal()
+
+```
+
+**The figure indicates the daily returns of S&P 500 from 1927 to 2020 with two major finance events well captured: the 1987 Black Monday crash and the 2008 financial meltdown. The blue vertical line identifies October 19, 1987, which was the single worst percentage decrease in market history. The red line identifies September 15, 2008, the date Lehman Brothers collapsed, causing a global economic meltdown.**
+
+**Both incidents are associated with huge peaks in volatility, reflecting the violent market reactions during the times of insecurity and fear. Such violent moves contrast with relative stability experienced throughout the majority of the timeline where the daily returns cluster around zero. The graph is successful in recognizing how rare but spectacular events destroy the expected pattern of the market and lead to unpredictable price fluctuations, confirming the huge impact that monumental economic shocks have on investor action.**
+
+**Testing whether the null hypothesis that the mean daily return after the 2008 crash is 0.**
+
+```{r test the null hypothesis that the mean daily return after the 2008 crash is 0}
+stock_market_clean <- stock_market_clean %>%
+  filter(!is.na(Return)) %>%
+  mutate(EventPeriod = ifelse(Date < as.Date("2008-09-15"), "Before 2008", "After 2008"))
+
+null_dist <- stock_market_clean %>%
+  filter(EventPeriod == "After 2008") %>%
+  specify(response = Return) %>%
+  hypothesize(null = "point", mu = 0) %>%
+  generate(reps = 10000, type = "bootstrap") %>%
+  calculate(stat = "mean")
+
+observed_stat <- stock_market_clean %>%
+  filter(EventPeriod == "After 2008") %>%
+  summarise(mean_return = mean(Return)) %>%
+  pull(mean_return)
+
+null_dist %>%
+  ggplot(aes(x = stat)) +
+  geom_histogram(binwidth = 0.0001, fill = "skyblue", color = 'black', alpha = 0.6) +
+  geom_vline(xintercept = observed_stat, color = "red") +
+  labs(x = "Bootstrapped Mean Return",y = "Count",title = "Bootstrapped Null Distribution (After 2008)")
+```
+
+```{r calculating the p-value}
+null_dist %>%
+  filter(stat >= abs(observed_stat) | stat <= -abs(observed_stat)) %>%
+  summarise(p_value = n() / nrow(null_dist))
+
+```
+
+**The histogram above is the bootstrapped null distribution of the S&P 500 mean daily returns after the 2008 financial crisis, assuming the true mean return is zero. The bell curve is what we would observe if daily returns were just random fluctuations around zero. The red dashed line represents the actual mean return during this period. As this observed value lies comfortably slightly to the right of the middle of the null distribution, it does not look unusually extreme.**
+
+**The p-value corresponding to this, as computed from the distribution, is about 0.0803. This suggests that there is roughly an 8.2% chance of getting a mean return as extreme as the one observed—when there is actually no effect. As this p-value is greater than the standard 0.05 significance level, we do not have sufficient statistical evidence to reject the null hypothesis. Therefore, while the results suggest after the 2008 crash the mean return was slightly positive, it was not statistically different from zero.**
+
+
+```{r linear model of close price and time}
+stock_market_clean <- stock_market_df %>%
+  mutate(Time = as.numeric(Date))
+
+model_price <- lm(Close ~ Time, data = stock_market_clean)
+summary(model_price)
+```
+```{r tidying the model}
+tidy(summary(model_price))
+```
+**The estimated linear model equation is: Close = 0.05917* Time + 389.44. **
+
+**The fitted linear model suggests a clear pattern of the S&P 500 closing price increasing over time. According to the model, the price increases approximately 0.059 points daily on average. Both the intercept and the slope are extremely statistically significant (p-value = 0), with high linear relationship between market level and time. This result accords with the long-term rising trend in the stock market in the past century.**
+
+```{r closing prices over time}
+stock_market_clean <- stock_market_clean %>%
+  mutate(Time = as.numeric(Date-min(Date)))  
+
+ggplot(stock_market_clean, aes(x = Time, y = Close)) +
+  geom_point(alpha = 0.3, color = "darkblue") +
+  labs(title = "S&P 500 Closing Prices Over Time", x = "Time (number of days since 30th December 1927)", y = "Closing Price ($)") +
+  theme_minimal()
+```
+
+
