@@ -17,39 +17,39 @@ Variables: Open, High, Low, Close, Adjusted Close, Volume
 
 # Key Analysis Components
 
--Data cleaning and time transformation
+- Data cleaning and time transformation
 
--Daily return calculation
+- Daily return calculation
 
--Volatility measurement
+- Volatility measurement
 
--Bootstrap confidence intervals (95%)
+- Bootstrap confidence intervals (95%)
 
--Hypothesis testing (post-2008 crash returns)
+- Hypothesis testing (post-2008 crash returns)
 
--Decade-wise return & volatility comparison
+- Decade-wise return & volatility comparison
 
--Weekday and monthly seasonality analysis
+- Weekday and monthly seasonality analysis
 
--Market crash visualization (1987 & 2008)
+- Market crash visualization (1987 & 2008)
 
--Linear regression modeling of price trends
+- Linear regression modeling of price trends
 
 # Major Insights
 
--Mean daily return: ~0.03%
+- Mean daily return: ~0.03%
 
--Daily volatility (SD): ~1.2%
+- Daily volatility (SD): ~1.2%
 
--Extreme returns: −20.5% to +16.6%
+- Extreme returns: −20.5% to +16.6%
 
--95% bootstrap CI confirms consistent long-term positive drift
+- 95% bootstrap CI confirms consistent long-term positive drift
 
--Mild Monday effect and September weakness observed
+- Mild Monday effect and September weakness observed
 
--Strong upward linear trend over nearly 100 years
+- Strong upward linear trend over nearly 100 years
 
--Bootstrapped hypothesis testing suggests post-2008 returns were slightly positive but not statistically different from zero at the 5% significance level.
+- Bootstrapped hypothesis testing suggests post-2008 returns were slightly positive but not statistically different from zero at the 5% significance level.
 
 # Libraries Used
 
